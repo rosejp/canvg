@@ -1,4 +1,4 @@
-/*
+/*!
  * canvg.js - Javascript SVG parser and renderer on Canvas
  * MIT Licensed
  * Gabe Lerner (gabelerner@gmail.com)
@@ -6,24 +6,7 @@
  *
  * Requires: rgbcolor.js - http://www.phpied.com/rgb-color-parser-in-javascript/
  */
- (function ( global, factory ) {
-
-	'use strict';
-
-	// export as AMD...
-	if ( typeof define !== 'undefined' && define.amd ) {
-		define('canvgModule', [ 'rgbcolor', 'stackblur' ], factory );
-	}
-
-	// ...or as browserify
-	else if ( typeof module !== 'undefined' && module.exports ) {
-		module.exports = factory( require( 'rgbcolor' ), require( 'stackblur' ) );
-	}
-
-	global.canvg = factory( global.RGBColor, global.stackBlur );
-
-}( typeof window !== 'undefined' ? window : this, function ( RGBColor, stackBlur ) {
-
+(function(){
 	// canvg(target, s)
 	// empty parameters: replace all 'svg' elements on page with 'canvas' elements
 	// target: canvas element or the id of a canvas element
@@ -39,10 +22,10 @@
 	//		 scaleHeight: int => scales vertically to height
 	//		 renderCallback: function => will call the function after the first render is completed
 	//		 forceRedraw: function => will call the function on every frame, if it returns true, will redraw
-	var canvg = function (target, s, opts) {
+	this.canvg = function (target, s, opts) {
 		// no parameters
 		if (target == null && s == null && opts == null) {
-			var svgTags = document.querySelectorAll('svg');
+			var svgTags = document.getElementsByTagName('svg');
 			var max_val = svgTags.length;
 			for (var i=0; i<max_val; i++) {
 				var svgTag = svgTags[0];
@@ -57,6 +40,7 @@
 			}
 			return;
 		}
+		opts = opts || {};
 
 		if (typeof target == 'string') {
 			target = document.getElementById(target);
@@ -64,12 +48,13 @@
 
 		// store class on canvas
 		if (target.svg != null) target.svg.stop();
-		var svg = build(opts || {});
+		var svg = build();
 		// on i.e. 8 for flash canvas, we can't assign the property so check for it
 		if (!(target.childNodes.length == 1 && target.childNodes[0].nodeName == 'OBJECT')) target.svg = svg;
+		svg.opts = opts;
 
 		var ctx = target.getContext('2d');
-		if (typeof s.documentElement != 'undefined') {
+		if (typeof(s.documentElement) != 'undefined') {
 			// load from xml doc
 			svg.loadXmlDoc(ctx, s);
 		}
@@ -83,88 +68,11 @@
 		}
 	}
 
-	// see https://developer.mozilla.org/en-US/docs/Web/API/Element.matches
-	var matchesSelector;
-	if (typeof Element.prototype.matches != 'undefined') {
-		matchesSelector = function(node, selector) {
-			return node.matches(selector);
-		};
-	} else if (typeof Element.prototype.webkitMatchesSelector != 'undefined') {
-		matchesSelector = function(node, selector) {
-			return node.webkitMatchesSelector(selector);
-		};
-	} else if (typeof Element.prototype.mozMatchesSelector != 'undefined') {
-		matchesSelector = function(node, selector) {
-			return node.mozMatchesSelector(selector);
-		};
-	} else if (typeof Element.prototype.msMatchesSelector != 'undefined') {
-		matchesSelector = function(node, selector) {
-			return node.msMatchesSelector(selector);
-		};
-	} else if (typeof Element.prototype.oMatchesSelector != 'undefined') {
-		matchesSelector = function(node, selector) {
-			return node.oMatchesSelector(selector);
-		};
-	} else {
-		// requires Sizzle: https://github.com/jquery/sizzle/wiki/Sizzle-Documentation
-		// or jQuery: http://jquery.com/download/
-		// or Zepto: http://zeptojs.com/#
-		// without it, this is a ReferenceError
-
-		if (typeof jQuery === 'function' || typeof Zepto === 'function') {
-			matchesSelector = function (node, selector) {
-				return $(node).is(selector);
-			};
-		}
-
-		if (typeof matchesSelector === 'undefined') {
-			matchesSelector = Sizzle.matchesSelector;
-		}
-	}
-
-	// slightly modified version of https://github.com/keeganstreet/specificity/blob/master/specificity.js
-	var attributeRegex = /(\[[^\]]+\])/g;
-	var idRegex = /(#[^\s\+>~\.\[:]+)/g;
-	var classRegex = /(\.[^\s\+>~\.\[:]+)/g;
-	var pseudoElementRegex = /(::[^\s\+>~\.\[:]+|:first-line|:first-letter|:before|:after)/gi;
-	var pseudoClassWithBracketsRegex = /(:[\w-]+\([^\)]*\))/gi;
-	var pseudoClassRegex = /(:[^\s\+>~\.\[:]+)/g;
-	var elementRegex = /([^\s\+>~\.\[:]+)/g;
-	function getSelectorSpecificity(selector) {
-		var typeCount = [0, 0, 0];
-		var findMatch = function(regex, type) {
-			var matches = selector.match(regex);
-			if (matches == null) {
-				return;
-			}
-			typeCount[type] += matches.length;
-			selector = selector.replace(regex, ' ');
-		};
-
-		selector = selector.replace(/:not\(([^\)]*)\)/g, '     $1 ');
-		selector = selector.replace(/{[^]*/gm, ' ');
-		findMatch(attributeRegex, 1);
-		findMatch(idRegex, 0);
-		findMatch(classRegex, 1);
-		findMatch(pseudoElementRegex, 2);
-		findMatch(pseudoClassWithBracketsRegex, 1);
-		findMatch(pseudoClassRegex, 1);
-		selector = selector.replace(/[\*\s\+>~]/g, ' ');
-		selector = selector.replace(/[#\.]/g, ' ');
-		findMatch(elementRegex, 2);
-		return typeCount.join('');
-	}
-
-	function build(opts) {
-		var svg = { opts: opts };
+	function build() {
+		var svg = { };
 
 		svg.FRAMERATE = 30;
 		svg.MAX_VIRTUAL_PIXELS = 30000;
-
-		svg.log = function(msg) {};
-		if (svg.opts['log'] == true && typeof console != 'undefined') {
-			svg.log = function(msg) { console.log(msg); };
-		};
 
 		// globals
 		svg.init = function(ctx) {
@@ -172,7 +80,6 @@
 			svg.UniqueId = function () { uniqueId++; return 'canvg' + uniqueId;	};
 			svg.Definitions = {};
 			svg.Styles = {};
-			svg.StylesSpecificity = {};
 			svg.Animations = [];
 			svg.Images = [];
 			svg.ctx = ctx;
@@ -185,7 +92,7 @@
 				this.width = function() { return this.Current().width; }
 				this.height = function() { return this.Current().height; }
 				this.ComputeSize = function(d) {
-					if (d != null && typeof d == 'number') return d;
+					if (d != null && typeof(d) == 'number') return d;
 					if (d == 'x') return this.width();
 					if (d == 'y') return this.height();
 					return Math.sqrt(Math.pow(this.width(), 2) + Math.pow(this.height(), 2)) / Math.sqrt(2);
@@ -223,14 +130,7 @@
 
 		// parse xml
 		svg.parseXml = function(xml) {
-			if (typeof Windows != 'undefined' && typeof Windows.Data != 'undefined' && typeof Windows.Data.Xml != 'undefined') {
-				var xmlDoc = new Windows.Data.Xml.Dom.XmlDocument();
-				var settings = new Windows.Data.Xml.Dom.XmlLoadSettings();
-				settings.prohibitDtd = false;
-				xmlDoc.loadXml(xml, settings);
-				return xmlDoc;
-			}
-			else if (window.DOMParser)
+			if (window.DOMParser)
 			{
 				var parser = new DOMParser();
 				return parser.parseFromString(xml, 'text/xml');
@@ -280,12 +180,12 @@
 
 			// color extensions
 				// augment the current color value with the opacity
-				svg.Property.prototype.addOpacity = function(opacityProp) {
+				svg.Property.prototype.addOpacity = function(opacity) {
 					var newValue = this.value;
-					if (opacityProp.value != null && opacityProp.value != '' && typeof this.value == 'string') { // can only add opacity to colors, not patterns
+					if (opacity != null && opacity != '' && typeof(this.value)=='string') { // can only add opacity to colors, not patterns
 						var color = new RGBColor(this.value);
 						if (color.ok) {
-							newValue = 'rgba(' + color.r + ', ' + color.g + ', ' + color.b + ', ' + opacityProp.numValue() + ')';
+							newValue = 'rgba(' + color.r + ', ' + color.g + ', ' + color.b + ', ' + opacity + ')';
 						}
 					}
 					return new svg.Property(this.name, newValue);
@@ -381,26 +281,6 @@
 					if (s.match(/grad$/)) return this.numValue() * (Math.PI / 200.0);
 					if (s.match(/rad$/)) return this.numValue();
 					return this.numValue() * (Math.PI / 180.0);
-				}
-
-			// text extensions
-				// get the text baseline
-				var textBaselineMapping = {
-					'baseline': 'alphabetic',
-					'before-edge': 'top',
-					'text-before-edge': 'top',
-					'middle': 'middle',
-					'central': 'middle',
-					'after-edge': 'bottom',
-					'text-after-edge': 'bottom',
-					'ideographic': 'ideographic',
-					'alphabetic': 'alphabetic',
-					'hanging': 'hanging',
-					'mathematical': 'alphabetic'
-				};
-				svg.Property.prototype.toTextBaseline = function () {
-					if (!this.hasValue()) return null;
-					return textBaselineMapping[this.value];
 				}
 
 		// fonts
@@ -633,26 +513,6 @@
 				this.apply = function(ctx) {
 					ctx.transform(this.m[0], this.m[1], this.m[2], this.m[3], this.m[4], this.m[5]);
 				}
-				this.unapply = function(ctx) {
-					var a = this.m[0];
-					var b = this.m[2];
-					var c = this.m[4];
-					var d = this.m[1];
-					var e = this.m[3];
-					var f = this.m[5];
-					var g = 0.0;
-					var h = 0.0;
-					var i = 1.0;
-					var det = 1 / (a*(e*i-f*h)-b*(d*i-f*g)+c*(d*h-e*g));
-					ctx.transform(
-						det*(e*i-f*h),
-						det*(f*g-d*i),
-						det*(c*h-b*i),
-						det*(a*i-c*g),
-						det*(b*f-c*e),
-						det*(c*d-a*f)
-					);
-				}
 				this.applyToPoint = function(p) {
 					p.applyTransform(this.m);
 				}
@@ -699,16 +559,13 @@
 				}
 			}
 
-			var data = svg.trim(svg.compressSpaces(v)).replace(/\)([a-zA-Z])/g, ') $1').replace(/\)(\s?,\s?)/g,') ').split(/\s(?=[a-z])/);
+			var data = svg.trim(svg.compressSpaces(v)).replace(/\)(\s?,\s?)/g,') ').split(/\s(?=[a-z])/);
 			for (var i=0; i<data.length; i++) {
 				var type = svg.trim(data[i].split('(')[0]);
 				var s = data[i].split('(')[1].replace(')','');
-				var transformType = this.Type[type];
-				if (typeof transformType != 'undefined') {
-					var transform = new transformType(s);
-					transform.type = type;
-					this.transforms.push(transform);
-				}
+				var transform = new this.Type[type](s);
+				transform.type = type;
+				this.transforms.push(transform);
 			}
 		}
 
@@ -758,7 +615,6 @@
 		svg.Element.ElementBase = function(node) {
 			this.attributes = {};
 			this.styles = {};
-			this.stylesSpecificity = {};
 			this.children = [];
 
 			// get or create attribute
@@ -772,7 +628,7 @@
 
 			this.getHrefAttribute = function() {
 				for (var a in this.attributes) {
-					if (a == 'href' || a.match(/:href$/)) {
+					if (a.match(/:href$/)) {
 						return this.attributes[a];
 					}
 				}
@@ -780,7 +636,7 @@
 			}
 
 			// get or create style, crawls up node tree
-			this.style = function(name, createIfNotExists, skipAncestors) {
+			this.style = function(name, createIfNotExists) {
 				var s = this.styles[name];
 				if (s != null) return s;
 
@@ -790,13 +646,11 @@
 					return a;
 				}
 
-				if (skipAncestors != true) {
-					var p = this.parent;
-					if (p != null) {
-						var ps = p.style(name);
-						if (ps != null && ps.hasValue()) {
-							return ps;
-						}
+				var p = this.parent;
+				if (p != null) {
+					var ps = p.style(name);
+					if (ps != null && ps.hasValue()) {
+						return ps;
 					}
 				}
 
@@ -810,11 +664,11 @@
 				if (this.style('display').value == 'none') return;
 
 				// don't render visibility=hidden
-				if (this.style('visibility').value == 'hidden') return;
+				if (this.attribute('visibility').value == 'hidden') return;
 
 				ctx.save();
-				if (this.style('mask').hasValue()) { // mask
-					var mask = this.style('mask').getDefinition();
+				if (this.attribute('mask').hasValue()) { // mask
+					var mask = this.attribute('mask').getDefinition();
 					if (mask != null) mask.apply(ctx, this);
 				}
 				else if (this.style('filter').hasValue()) { // filter
@@ -850,39 +704,64 @@
 				var child = childNode;
 				if (create) child = svg.CreateElement(childNode);
 				child.parent = this;
-				if (child.type != 'title') { this.children.push(child);	}
+				this.children.push(child);
 			}
 
-			this.addStylesFromStyleDefinition = function () {
-				// add styles
-				for (var selector in svg.Styles) {
-					if (selector[0] != '@' && matchesSelector(node, selector)) {
-						var styles = svg.Styles[selector];
-						var specificity = svg.StylesSpecificity[selector];
+			if (node != null && node.nodeType == 1) { //ELEMENT_NODE
+				// add children
+				for (var i=0; i<node.childNodes.length; i++) {
+					var childNode = node.childNodes[i];
+					if (childNode.nodeType == 1) this.addChild(childNode, true); //ELEMENT_NODE
+					if (this.captureTextNodes && childNode.nodeType == 3) {
+						var text = childNode.nodeValue || childNode.text || '';
+						if (svg.trim(svg.compressSpaces(text)) != '') {
+							this.addChild(new svg.Element.tspan(childNode), false); // TEXT_NODE
+						}
+					}
+				}
+
+				// add attributes
+				for (var i=0; i<node.attributes.length; i++) {
+					var attribute = node.attributes[i];
+					this.attributes[attribute.nodeName] = new svg.Property(attribute.nodeName, attribute.nodeValue);
+				}
+
+				// add tag styles
+				var styles = svg.Styles[node.nodeName];
+				if (styles != null) {
+					for (var name in styles) {
+						this.styles[name] = styles[name];
+					}
+				}
+
+				// add class styles
+				if (this.attribute('class').hasValue()) {
+					var classes = svg.compressSpaces(this.attribute('class').value).split(' ');
+					for (var j=0; j<classes.length; j++) {
+						styles = svg.Styles['.'+classes[j]];
 						if (styles != null) {
 							for (var name in styles) {
-								var existingSpecificity = this.stylesSpecificity[name];
-								if (typeof existingSpecificity == 'undefined') {
-									existingSpecificity = '000';
-								}
-								if (specificity > existingSpecificity) {
-									this.styles[name] = styles[name];
-									this.stylesSpecificity[name] = specificity;
-								}
+								this.styles[name] = styles[name];
+							}
+						}
+						styles = svg.Styles[node.nodeName+'.'+classes[j]];
+						if (styles != null) {
+							for (var name in styles) {
+								this.styles[name] = styles[name];
 							}
 						}
 					}
 				}
-			};
 
-			if (node != null && node.nodeType == 1) { //ELEMENT_NODE
-				// add attributes
-				for (var i=0; i<node.attributes.length; i++) {
-					var attribute = node.attributes[i];
-					this.attributes[attribute.nodeName] = new svg.Property(attribute.nodeName, attribute.value);
+				// add id styles
+				if (this.attribute('id').hasValue()) {
+					var styles = svg.Styles['#' + this.attribute('id').value];
+					if (styles != null) {
+						for (var name in styles) {
+							this.styles[name] = styles[name];
+						}
+					}
 				}
-
-				this.addStylesFromStyleDefinition();
 
 				// add inline styles
 				if (this.attribute('style').hasValue()) {
@@ -903,18 +782,6 @@
 						svg.Definitions[this.attribute('id').value] = this;
 					}
 				}
-
-				// add children
-				for (var i=0; i<node.childNodes.length; i++) {
-					var childNode = node.childNodes[i];
-					if (childNode.nodeType == 1) this.addChild(childNode, true); //ELEMENT_NODE
-					if (this.captureTextNodes && (childNode.nodeType == 3 || childNode.nodeType == 4)) {
-						var text = childNode.value || childNode.text || childNode.textContent || '';
-						if (svg.compressSpaces(text) != '') {
-							this.addChild(new svg.Element.tspan(childNode), false); // TEXT_NODE
-						}
-					}
-				}
 			}
 		}
 
@@ -931,11 +798,11 @@
 				else if (this.style('fill').hasValue()) {
 					var fillStyle = this.style('fill');
 					if (fillStyle.value == 'currentColor') fillStyle.value = this.style('color').value;
-					if (fillStyle.value != 'inherit') ctx.fillStyle = (fillStyle.value == 'none' ? 'rgba(0,0,0,0)' : fillStyle.value);
+					ctx.fillStyle = (fillStyle.value == 'none' ? 'rgba(0,0,0,0)' : fillStyle.value);
 				}
 				if (this.style('fill-opacity').hasValue()) {
 					var fillStyle = new svg.Property('fill', ctx.fillStyle);
-					fillStyle = fillStyle.addOpacity(this.style('fill-opacity'));
+					fillStyle = fillStyle.addOpacity(this.style('fill-opacity').value);
 					ctx.fillStyle = fillStyle.value;
 				}
 
@@ -947,11 +814,11 @@
 				else if (this.style('stroke').hasValue()) {
 					var strokeStyle = this.style('stroke');
 					if (strokeStyle.value == 'currentColor') strokeStyle.value = this.style('color').value;
-					if (strokeStyle.value != 'inherit') ctx.strokeStyle = (strokeStyle.value == 'none' ? 'rgba(0,0,0,0)' : strokeStyle.value);
+					ctx.strokeStyle = (strokeStyle.value == 'none' ? 'rgba(0,0,0,0)' : strokeStyle.value);
 				}
 				if (this.style('stroke-opacity').hasValue()) {
 					var strokeStyle = new svg.Property('stroke', ctx.strokeStyle);
-					strokeStyle = strokeStyle.addOpacity(this.style('stroke-opacity'));
+					strokeStyle = strokeStyle.addOpacity(this.style('stroke-opacity').value);
 					ctx.strokeStyle = strokeStyle.value;
 				}
 				if (this.style('stroke-width').hasValue()) {
@@ -961,20 +828,20 @@
 				if (this.style('stroke-linecap').hasValue()) ctx.lineCap = this.style('stroke-linecap').value;
 				if (this.style('stroke-linejoin').hasValue()) ctx.lineJoin = this.style('stroke-linejoin').value;
 				if (this.style('stroke-miterlimit').hasValue()) ctx.miterLimit = this.style('stroke-miterlimit').value;
-				if (this.style('stroke-dasharray').hasValue() && this.style('stroke-dasharray').value != 'none') {
+				if (this.style('stroke-dasharray').hasValue()) {
 					var gaps = svg.ToNumberArray(this.style('stroke-dasharray').value);
-					if (typeof ctx.setLineDash != 'undefined') { ctx.setLineDash(gaps); }
-					else if (typeof ctx.webkitLineDash != 'undefined') { ctx.webkitLineDash = gaps; }
-					else if (typeof ctx.mozDash != 'undefined' && !(gaps.length==1 && gaps[0]==0)) { ctx.mozDash = gaps; }
+					if (typeof(ctx.setLineDash) != 'undefined') { ctx.setLineDash(gaps); }
+					else if (typeof(ctx.webkitLineDash) != 'undefined') { ctx.webkitLineDash = gaps; }
+					else if (typeof(ctx.mozDash ) != 'undefined') { ctx.mozDash  = gaps; }
 
 					var offset = this.style('stroke-dashoffset').numValueOrDefault(1);
-					if (typeof ctx.lineDashOffset != 'undefined') { ctx.lineDashOffset = offset; }
-					else if (typeof ctx.webkitLineDashOffset != 'undefined') { ctx.webkitLineDashOffset = offset; }
-					else if (typeof ctx.mozDashOffset != 'undefined') { ctx.mozDashOffset = offset; }
+					if (typeof(ctx.lineDashOffset) != 'undefined') { ctx.lineDashOffset = offset; }
+					else if (typeof(ctx.webkitLineDashOffset) != 'undefined') { ctx.webkitLineDashOffset = offset; }
+					else if (typeof(ctx.mozDashOffset) != 'undefined') { ctx.mozDashOffset = offset; }
 				}
 
 				// font
-				if (typeof ctx.font != 'undefined') {
+				if (typeof(ctx.font) != 'undefined') {
 					ctx.font = svg.Font.CreateFont(
 						this.style('font-style').value,
 						this.style('font-variant').value,
@@ -984,14 +851,14 @@
 				}
 
 				// transform
-				if (this.style('transform', false, true).hasValue()) {
-					var transform = new svg.Transform(this.style('transform', false, true).value);
+				if (this.attribute('transform').hasValue()) {
+					var transform = new svg.Transform(this.attribute('transform').value);
 					transform.apply(ctx);
 				}
 
 				// clip
-				if (this.style('clip-path', false, true).hasValue()) {
-					var clip = this.style('clip-path', false, true).getDefinition();
+				if (this.style('clip-path').hasValue()) {
+					var clip = this.style('clip-path').getDefinition();
 					if (clip != null) clip.apply(ctx);
 				}
 
@@ -1016,7 +883,7 @@
 				this.path(ctx);
 				svg.Mouse.checkPath(this, ctx);
 				if (ctx.fillStyle != '') {
-					if (this.style('fill-rule').valueOrDefault('inherit') != 'inherit') { ctx.fill(this.style('fill-rule').value); }
+					if (this.attribute('fill-rule').hasValue()) { ctx.fill(this.attribute('fill-rule').value); }
 					else { ctx.fill(); }
 				}
 				if (ctx.strokeStyle != '') ctx.stroke();
@@ -1063,14 +930,11 @@
 
 			this.baseSetContext = this.setContext;
 			this.setContext = function(ctx) {
-				// initial values and defaults
+				// initial values
 				ctx.strokeStyle = 'rgba(0,0,0,0)';
 				ctx.lineCap = 'butt';
 				ctx.lineJoin = 'miter';
 				ctx.miterLimit = 4;
-				if (typeof ctx.font != 'undefined' && typeof window.getComputedStyle != 'undefined') {
-					ctx.font = window.getComputedStyle(ctx.canvas).getPropertyValue('font');
-				}
 
 				this.baseSetContext(ctx);
 
@@ -1084,7 +948,7 @@
 
 				if (!this.attribute('width').hasValue()) this.attribute('width', true).value = '100%';
 				if (!this.attribute('height').hasValue()) this.attribute('height', true).value = '100%';
-				if (typeof this.root == 'undefined') {
+				if (typeof(this.root) == 'undefined') {
 					width = this.attribute('width').toPixels('x');
 					height = this.attribute('height').toPixels('y');
 
@@ -1095,15 +959,13 @@
 						y = -this.attribute('refY').toPixels('y');
 					}
 
-					if (this.attribute('overflow').valueOrDefault('hidden') != 'visible') {
-						ctx.beginPath();
-						ctx.moveTo(x, y);
-						ctx.lineTo(width, y);
-						ctx.lineTo(width, height);
-						ctx.lineTo(x, height);
-						ctx.closePath();
-						ctx.clip();
-					}
+					ctx.beginPath();
+					ctx.moveTo(x, y);
+					ctx.lineTo(width, y);
+					ctx.lineTo(width, height);
+					ctx.lineTo(x, height);
+					ctx.closePath();
+					ctx.clip();
 				}
 				svg.ViewPort.SetCurrent(width, height);
 
@@ -1271,9 +1133,7 @@
 				for (var i=0; i<this.points.length - 1; i++) {
 					markers.push([this.points[i], this.points[i].angleTo(this.points[i+1])]);
 				}
-				if (markers.length > 0) {
-					markers.push([this.points[this.points.length-1], markers[markers.length-1][1]]);
-				}
+				markers.push([this.points[this.points.length-1], markers[markers.length-1][1]]);
 				return markers;
 			}
 		}
@@ -1304,14 +1164,12 @@
 			var d = this.attribute('d').value;
 			// TODO: convert to real lexer based on http://www.w3.org/TR/SVG11/paths.html#PathDataBNF
 			d = d.replace(/,/gm,' '); // get rid of all commas
-			// As the end of a match can also be the start of the next match, we need to run this replace twice.
-			for(var i=0; i<2; i++)
-				d = d.replace(/([MmZzLlHhVvCcSsQqTtAa])([^\s])/gm,'$1 $2'); // suffix commands with spaces
-			d = d.replace(/([^\s])([MmZzLlHhVvCcSsQqTtAa])/gm,'$1 $2'); // prefix commands with spaces
-			d = d.replace(/([0-9])([+\-])/gm,'$1 $2'); // separate digits on +- signs
-			// Again, we need to run this twice to find all occurances
-			for(var i=0; i<2; i++)
-				d = d.replace(/(\.[0-9]*)(\.)/gm,'$1 $2'); // separate digits when they start with a comma
+			d = d.replace(/([MmZzLlHhVvCcSsQqTtAa])([MmZzLlHhVvCcSsQqTtAa])/gm,'$1 $2'); // separate commands from commands
+			d = d.replace(/([MmZzLlHhVvCcSsQqTtAa])([MmZzLlHhVvCcSsQqTtAa])/gm,'$1 $2'); // separate commands from commands
+			d = d.replace(/([MmZzLlHhVvCcSsQqTtAa])([^\s])/gm,'$1 $2'); // separate commands from points
+			d = d.replace(/([^\s])([MmZzLlHhVvCcSsQqTtAa])/gm,'$1 $2'); // separate commands from points
+			d = d.replace(/([0-9])([+\-])/gm,'$1 $2'); // separate digits when no comma
+			d = d.replace(/(\.[0-9]*)(\.)/gm,'$1 $2'); // separate digits when no comma
 			d = d.replace(/([Aa](\s+[0-9]+){3})\s+([01])\s*([01])/gm,'$1 $3 $4 '); // shorthand elliptical arc path syntax
 			d = svg.compressSpaces(d); // compress multiple spaces
 			d = svg.trim(d);
@@ -1666,8 +1524,7 @@
 				for (var x=-1; x<=1; x++) {
 					for (var y=-1; y<=1; y++) {
 						cctx.save();
-						tempSvg.attributes['x'] = new svg.Property('x', x * c.width);
-						tempSvg.attributes['y'] = new svg.Property('y', y * c.height);
+						cctx.translate(x * c.width, y * c.height);
 						tempSvg.render(cctx);
 						cctx.restore();
 					}
@@ -1726,6 +1583,8 @@
 			this.base = svg.Element.ElementBase;
 			this.base(node);
 
+			this.gradientUnits = this.attribute('gradientUnits').valueOrDefault('objectBoundingBox');
+
 			this.stops = [];
 			for (var i=0; i<this.children.length; i++) {
 				var child = this.children[i];
@@ -1735,33 +1594,17 @@
 			this.getGradient = function() {
 				// OVERRIDE ME!
 			}
-			
-			this.gradientUnits = function () {
-				return this.attribute('gradientUnits').valueOrDefault('objectBoundingBox');
-			}
-			
-			this.attributesToInherit = ['gradientUnits'];
-			
-			this.inheritStopContainer = function (stopsContainer) {
-				for (var i=0; i<this.attributesToInherit.length; i++) {
-					var attributeToInherit = this.attributesToInherit[i];
-					if (!this.attribute(attributeToInherit).hasValue() && stopsContainer.attribute(attributeToInherit).hasValue()) {
-						this.attribute(attributeToInherit, true).value = stopsContainer.attribute(attributeToInherit).value;
-					}
-				}
-			}
 
 			this.createGradient = function(ctx, element, parentOpacityProp) {
 				var stopsContainer = this;
 				if (this.getHrefAttribute().hasValue()) {
 					stopsContainer = this.getHrefAttribute().getDefinition();
-					this.inheritStopContainer(stopsContainer);
 				}
 
 				var addParentOpacity = function (color) {
 					if (parentOpacityProp.hasValue()) {
 						var p = new svg.Property('color', color);
-						return p.addOpacity(parentOpacityProp).value;
+						return p.addOpacity(parentOpacityProp.value).value;
 					}
 					return color;
 				};
@@ -1811,14 +1654,9 @@
 		svg.Element.linearGradient = function(node) {
 			this.base = svg.Element.GradientBase;
 			this.base(node);
-			
-			this.attributesToInherit.push('x1');
-			this.attributesToInherit.push('y1');
-			this.attributesToInherit.push('x2');
-			this.attributesToInherit.push('y2');
 
 			this.getGradient = function(ctx, element) {
-				var bb = this.gradientUnits() == 'objectBoundingBox' ? element.getBoundingBox() : null;
+				var bb = element.getBoundingBox();
 
 				if (!this.attribute('x1').hasValue()
 				 && !this.attribute('y1').hasValue()
@@ -1830,16 +1668,16 @@
 					this.attribute('y2', true).value = 0;
 				 }
 
-				var x1 = (this.gradientUnits() == 'objectBoundingBox'
+				var x1 = (this.gradientUnits == 'objectBoundingBox'
 					? bb.x() + bb.width() * this.attribute('x1').numValue()
 					: this.attribute('x1').toPixels('x'));
-				var y1 = (this.gradientUnits() == 'objectBoundingBox'
+				var y1 = (this.gradientUnits == 'objectBoundingBox'
 					? bb.y() + bb.height() * this.attribute('y1').numValue()
 					: this.attribute('y1').toPixels('y'));
-				var x2 = (this.gradientUnits() == 'objectBoundingBox'
+				var x2 = (this.gradientUnits == 'objectBoundingBox'
 					? bb.x() + bb.width() * this.attribute('x2').numValue()
 					: this.attribute('x2').toPixels('x'));
-				var y2 = (this.gradientUnits() == 'objectBoundingBox'
+				var y2 = (this.gradientUnits == 'objectBoundingBox'
 					? bb.y() + bb.height() * this.attribute('y2').numValue()
 					: this.attribute('y2').toPixels('y'));
 
@@ -1853,12 +1691,6 @@
 		svg.Element.radialGradient = function(node) {
 			this.base = svg.Element.GradientBase;
 			this.base(node);
-			
-			this.attributesToInherit.push('cx');
-			this.attributesToInherit.push('cy');
-			this.attributesToInherit.push('r');
-			this.attributesToInherit.push('fx');
-			this.attributesToInherit.push('fy');
 
 			this.getGradient = function(ctx, element) {
 				var bb = element.getBoundingBox();
@@ -1867,27 +1699,27 @@
 				if (!this.attribute('cy').hasValue()) this.attribute('cy', true).value = '50%';
 				if (!this.attribute('r').hasValue()) this.attribute('r', true).value = '50%';
 
-				var cx = (this.gradientUnits() == 'objectBoundingBox'
+				var cx = (this.gradientUnits == 'objectBoundingBox'
 					? bb.x() + bb.width() * this.attribute('cx').numValue()
 					: this.attribute('cx').toPixels('x'));
-				var cy = (this.gradientUnits() == 'objectBoundingBox'
+				var cy = (this.gradientUnits == 'objectBoundingBox'
 					? bb.y() + bb.height() * this.attribute('cy').numValue()
 					: this.attribute('cy').toPixels('y'));
 
 				var fx = cx;
 				var fy = cy;
 				if (this.attribute('fx').hasValue()) {
-					fx = (this.gradientUnits() == 'objectBoundingBox'
+					fx = (this.gradientUnits == 'objectBoundingBox'
 					? bb.x() + bb.width() * this.attribute('fx').numValue()
 					: this.attribute('fx').toPixels('x'));
 				}
 				if (this.attribute('fy').hasValue()) {
-					fy = (this.gradientUnits() == 'objectBoundingBox'
+					fy = (this.gradientUnits == 'objectBoundingBox'
 					? bb.y() + bb.height() * this.attribute('fy').numValue()
 					: this.attribute('fy').toPixels('y'));
 				}
 
-				var r = (this.gradientUnits() == 'objectBoundingBox'
+				var r = (this.gradientUnits == 'objectBoundingBox'
 					? (bb.width() + bb.height()) / 2.0 * this.attribute('r').numValue()
 					: this.attribute('r').toPixels());
 
@@ -1905,9 +1737,8 @@
 			if (this.offset < 0) this.offset = 0;
 			if (this.offset > 1) this.offset = 1;
 
-			var stopColor = this.style('stop-color', true);
-			if (stopColor.value === '') stopColor.value = '#000';
-			if (this.style('stop-opacity').hasValue()) stopColor = stopColor.addOpacity(this.style('stop-opacity'));
+			var stopColor = this.style('stop-color');
+			if (this.style('stop-opacity').hasValue()) stopColor = stopColor.addOpacity(this.style('stop-opacity').value);
 			this.color = stopColor.value;
 		}
 		svg.Element.stop.prototype = new svg.Element.ElementBase;
@@ -1956,17 +1787,14 @@
 					 || this.attribute('repeatDur').value == 'indefinite') {
 						this.duration = 0.0
 					}
-					else if (this.attribute('fill').valueOrDefault('remove') == 'freeze' && !this.frozen) {
-						this.frozen = true;
-						this.parent.animationFrozen = true;
-						this.parent.animationFrozenValue = this.getProperty().value;
-					}
 					else if (this.attribute('fill').valueOrDefault('remove') == 'remove' && !this.removed) {
 						this.removed = true;
-						this.getProperty().value = this.parent.animationFrozen ? this.parent.animationFrozenValue : this.initialValue;
+						this.getProperty().value = this.initialValue;
 						return true;
 					}
-					return false;
+					else {
+						return false; // no updates made
+					}
 				}
 				this.duration = this.duration + delta;
 
@@ -2094,7 +1922,7 @@
 					if (child.arabicForm != '') {
 						this.isRTL = true;
 						this.isArabic = true;
-						if (typeof this.glyphs[child.unicode] == 'undefined') this.glyphs[child.unicode] = [];
+						if (typeof(this.glyphs[child.unicode]) == 'undefined') this.glyphs[child.unicode] = [];
 						this.glyphs[child.unicode][child.arabicForm] = child;
 					}
 					else {
@@ -2145,27 +1973,21 @@
 			this.baseSetContext = this.setContext;
 			this.setContext = function(ctx) {
 				this.baseSetContext(ctx);
-
-				var textBaseline = this.style('dominant-baseline').toTextBaseline();
-				if (textBaseline == null) textBaseline = this.style('alignment-baseline').toTextBaseline();
-				if (textBaseline != null) ctx.textBaseline = textBaseline;
+				if (this.style('dominant-baseline').hasValue()) ctx.textBaseline = this.style('dominant-baseline').value;
+				if (this.style('alignment-baseline').hasValue()) ctx.textBaseline = this.style('alignment-baseline').value;
 			}
 
 			this.getBoundingBox = function () {
-				var x = this.attribute('x').toPixels('x');
-				var y = this.attribute('y').toPixels('y');
-				var fontSize = this.parent.style('font-size').numValueOrDefault(svg.Font.Parse(svg.ctx.font).fontSize);
-				return new svg.BoundingBox(x, y - fontSize, x + Math.floor(fontSize * 2.0 / 3.0) * this.children[0].getText().length, y);
+				// TODO: implement
+				return new svg.BoundingBox(this.attribute('x').toPixels('x'), this.attribute('y').toPixels('y'), 0, 0);
 			}
 
 			this.renderChildren = function(ctx) {
 				this.x = this.attribute('x').toPixels('x');
 				this.y = this.attribute('y').toPixels('y');
-				if (this.attribute('dx').hasValue()) this.x += this.attribute('dx').toPixels('x');
-				if (this.attribute('dy').hasValue()) this.y += this.attribute('dy').toPixels('y');
 				this.x += this.getAnchorDelta(ctx, this, 0);
 				for (var i=0; i<this.children.length; i++) {
-					this.renderChild(ctx, this, this, i);
+					this.renderChild(ctx, this, i);
 				}
 			}
 
@@ -2183,32 +2005,32 @@
 				return 0;
 			}
 
-			this.renderChild = function(ctx, textParent, parent, i) {
+			this.renderChild = function(ctx, parent, i) {
 				var child = parent.children[i];
 				if (child.attribute('x').hasValue()) {
-					child.x = child.attribute('x').toPixels('x') + textParent.getAnchorDelta(ctx, parent, i);
-					if (child.attribute('dx').hasValue()) child.x += child.attribute('dx').toPixels('x');
+					child.x = child.attribute('x').toPixels('x') + this.getAnchorDelta(ctx, parent, i);
 				}
 				else {
-					if (child.attribute('dx').hasValue()) textParent.x += child.attribute('dx').toPixels('x');
-					child.x = textParent.x;
+					if (this.attribute('dx').hasValue()) this.x += this.attribute('dx').toPixels('x');
+					if (child.attribute('dx').hasValue()) this.x += child.attribute('dx').toPixels('x');
+					child.x = this.x;
 				}
-				textParent.x = child.x + child.measureText(ctx);
+				this.x = child.x + child.measureText(ctx);
 
 				if (child.attribute('y').hasValue()) {
 					child.y = child.attribute('y').toPixels('y');
-					if (child.attribute('dy').hasValue()) child.y += child.attribute('dy').toPixels('y');
 				}
 				else {
-					if (child.attribute('dy').hasValue()) textParent.y += child.attribute('dy').toPixels('y');
-					child.y = textParent.y;
+					if (this.attribute('dy').hasValue()) this.y += this.attribute('dy').toPixels('y');
+					if (child.attribute('dy').hasValue()) this.y += child.attribute('dy').toPixels('y');
+					child.y = this.y;
 				}
-				textParent.y = child.y;
+				this.y = child.y;
 
 				child.render(ctx);
 
 				for (var i=0; i<child.children.length; i++) {
-					textParent.renderChild(ctx, textParent, child, i);
+					this.renderChild(ctx, child, i);
 				}
 			}
 		}
@@ -2227,7 +2049,7 @@
 					if ((i==0 || text[i-1]==' ') && i<text.length-2 && text[i+1]!=' ') arabicForm = 'terminal';
 					if (i>0 && text[i-1]!=' ' && i<text.length-2 && text[i+1]!=' ') arabicForm = 'medial';
 					if (i>0 && text[i-1]!=' ' && (i == text.length-1 || text[i+1]==' ')) arabicForm = 'initial';
-					if (typeof font.glyphs[c] != 'undefined') {
+					if (typeof(font.glyphs[c]) != 'undefined') {
 						glyph = font.glyphs[c][arabicForm];
 						if (glyph == null && font.glyphs[c].type == 'glyph') glyph = font.glyphs[c];
 					}
@@ -2263,7 +2085,7 @@
 						ctx.translate(-this.x, -this.y);
 
 						this.x += fontSize * (glyph.horizAdvX || customFont.horizAdvX) / customFont.fontFace.unitsPerEm;
-						if (typeof dx[i] != 'undefined' && !isNaN(dx[i])) {
+						if (typeof(dx[i]) != 'undefined' && !isNaN(dx[i])) {
 							this.x += dx[i];
 						}
 					}
@@ -2297,7 +2119,7 @@
 					for (var i=0; i<text.length; i++) {
 						var glyph = this.getGlyph(customFont, text, i);
 						measure += (glyph.horizAdvX || customFont.horizAdvX) * fontSize / customFont.fontFace.unitsPerEm;
-						if (typeof dx[i] != 'undefined' && !isNaN(dx[i])) {
+						if (typeof(dx[i]) != 'undefined' && !isNaN(dx[i])) {
 							measure += dx[i];
 						}
 					}
@@ -2322,10 +2144,8 @@
 			this.base = svg.Element.TextElementBase;
 			this.base(node);
 
-			this.text = svg.compressSpaces(node.value || node.text || node.textContent || '');
+			this.text = node.nodeValue || node.text || '';
 			this.getText = function() {
-				// if this node has children, then they own the text
-				if (this.children.length > 0) { return ''; }
 				return this.text;
 			}
 		}
@@ -2348,13 +2168,13 @@
 			this.base = svg.Element.TextElementBase;
 			this.base(node);
 
-			this.hasText = node.childNodes.length > 0;
+			this.hasText = true;
 			for (var i=0; i<node.childNodes.length; i++) {
 				if (node.childNodes[i].nodeType != 3) this.hasText = false;
 			}
 
 			// this might contain text
-			this.text = this.hasText ? node.childNodes[0].value : '';
+			this.text = this.hasText ? node.childNodes[0].nodeValue : '';
 			this.getText = function() {
 				return this.text;
 			}
@@ -2367,7 +2187,7 @@
 					var fontSize = new svg.Property('fontSize', svg.Font.Parse(svg.ctx.font).fontSize);
 					svg.Mouse.checkBoundingBox(this, new svg.BoundingBox(this.x, this.y - fontSize.toPixels('y'), this.x + this.measureText(ctx), this.y));
 				}
-				else if (this.children.length > 0) {
+				else {
 					// render as temporary group
 					var g = new svg.Element.g();
 					g.children = this.children;
@@ -2392,17 +2212,15 @@
 			this.base(node);
 
 			var href = this.getHrefAttribute().value;
-			if (href == '') { return; }
 			var isSvg = href.match(/\.svg$/)
 
 			svg.Images.push(this);
 			this.loaded = false;
 			if (!isSvg) {
 				this.img = document.createElement('img');
-				if (svg.opts['useCORS'] == true) { this.img.crossOrigin = 'Anonymous'; }
 				var self = this;
 				this.img.onload = function() { self.loaded = true; }
-				this.img.onerror = function() { svg.log('ERROR: image "' + href + '" not found'); self.loaded = true; }
+				this.img.onerror = function() { if (typeof(console) != 'undefined') { console.log('ERROR: image "' + href + '" not found'); self.loaded = true; } }
 				this.img.src = href;
 			}
 			else {
@@ -2467,9 +2285,30 @@
 			this.base = svg.Element.RenderedElementBase;
 			this.base(node);
 
-			this.render = function(ctx) {
-				// NO RENDER
-			};
+			this.baseSetContext = this.setContext;
+			this.setContext = function(ctx) {
+				this.baseSetContext(ctx);
+
+				// viewbox
+				if (this.attribute('viewBox').hasValue()) {
+					var viewBox = svg.ToNumberArray(this.attribute('viewBox').value);
+					var minX = viewBox[0];
+					var minY = viewBox[1];
+					width = viewBox[2];
+					height = viewBox[3];
+
+					svg.AspectRatio(ctx,
+									this.attribute('preserveAspectRatio').value,
+									this.attribute('width').toPixels('x'),
+									width,
+									this.attribute('height').toPixels('y'),
+									height,
+									minX,
+									minY);
+
+					svg.ViewPort.SetCurrent(viewBox[2], viewBox[3]);
+				}
+			}
 		}
 		svg.Element.symbol.prototype = new svg.Element.RenderedElementBase;
 
@@ -2481,7 +2320,7 @@
 			// text, or spaces then CDATA
 			var css = ''
 			for (var i=0; i<node.childNodes.length; i++) {
-			  css += node.childNodes[i].data;
+			  css += node.childNodes[i].nodeValue;
 			}
 			css = css.replace(/(\/\*([^*]|[\r\n]|(\*+([^*\/]|[\r\n])))*\*+\/)|(^[\s]*\/\/.*)/gm, ''); // remove comments
 			css = svg.compressSpaces(css); // replace whitespace
@@ -2494,7 +2333,7 @@
 					for (var j=0; j<cssClasses.length; j++) {
 						var cssClass = svg.trim(cssClasses[j]);
 						if (cssClass != '') {
-							var props = svg.Styles[cssClass] || {};
+							var props = {};
 							for (var k=0; k<cssProps.length; k++) {
 								var prop = cssProps[k].indexOf(':');
 								var name = cssProps[k].substr(0, prop);
@@ -2504,7 +2343,6 @@
 								}
 							}
 							svg.Styles[cssClass] = props;
-							svg.StylesSpecificity[cssClass] = getSelectorSpecificity(cssClass);
 							if (cssClass == '@font-face') {
 								var fontFamily = props['font-family'].value.replace(/"/g,'');
 								var srcs = props['src'].value.split(',');
@@ -2541,37 +2379,31 @@
 				if (this.attribute('y').hasValue()) ctx.translate(0, this.attribute('y').toPixels('y'));
 			}
 
-			var element = this.getHrefAttribute().getDefinition();
+			this.getDefinition = function() {
+				var element = this.getHrefAttribute().getDefinition();
+				if (this.attribute('width').hasValue()) element.attribute('width', true).value = this.attribute('width').value;
+				if (this.attribute('height').hasValue()) element.attribute('height', true).value = this.attribute('height').value;
+				return element;
+			}
 
 			this.path = function(ctx) {
+				var element = this.getDefinition();
 				if (element != null) element.path(ctx);
 			}
 
 			this.getBoundingBox = function() {
+				var element = this.getDefinition();
 				if (element != null) return element.getBoundingBox();
 			}
 
 			this.renderChildren = function(ctx) {
+				var element = this.getDefinition();
 				if (element != null) {
-					var tempSvg = element;
-					if (element.type == 'symbol') {
-						// render me using a temporary svg element in symbol cases (http://www.w3.org/TR/SVG/struct.html#UseElement)
-						tempSvg = new svg.Element.svg();
-						tempSvg.type = 'svg';
-						tempSvg.attributes['viewBox'] = new svg.Property('viewBox', element.attribute('viewBox').value);
-						tempSvg.attributes['preserveAspectRatio'] = new svg.Property('preserveAspectRatio', element.attribute('preserveAspectRatio').value);
-						tempSvg.attributes['overflow'] = new svg.Property('overflow', element.attribute('overflow').value);
-						tempSvg.children = element.children;
-					}
-					if (tempSvg.type == 'svg') {
-						// if symbol or svg, inherit width/height from me
-						if (this.attribute('width').hasValue()) tempSvg.attributes['width'] = new svg.Property('width', this.attribute('width').value);
-						if (this.attribute('height').hasValue()) tempSvg.attributes['height'] = new svg.Property('height', this.attribute('height').value);
-					}
-					var oldParent = tempSvg.parent;
-					tempSvg.parent = null;
-					tempSvg.render(ctx);
-					tempSvg.parent = oldParent;
+					// temporarily detach from parent and render
+					var oldParent = element.parent;
+					element.parent = null;
+					element.render(ctx);
+					element.parent = oldParent;
 				}
 			}
 		}
@@ -2638,31 +2470,19 @@
 			this.base(node);
 
 			this.apply = function(ctx) {
-				var oldBeginPath = CanvasRenderingContext2D.prototype.beginPath;
-				CanvasRenderingContext2D.prototype.beginPath = function () { };
-
-				var oldClosePath = CanvasRenderingContext2D.prototype.closePath;
-				CanvasRenderingContext2D.prototype.closePath = function () { };
-
-				oldBeginPath.call(ctx);
 				for (var i=0; i<this.children.length; i++) {
 					var child = this.children[i];
-					if (typeof child.path != 'undefined') {
+					if (typeof(child.path) != 'undefined') {
 						var transform = null;
-						if (child.style('transform', false, true).hasValue()) {
-							transform = new svg.Transform(child.style('transform', false, true).value);
+						if (child.attribute('transform').hasValue()) {
+							transform = new svg.Transform(child.attribute('transform').value);
 							transform.apply(ctx);
 						}
 						child.path(ctx);
-						CanvasRenderingContext2D.prototype.closePath = oldClosePath;
+						ctx.clip();
 						if (transform) { transform.unapply(ctx); }
 					}
 				}
-				oldClosePath.call(ctx);
-				ctx.clip();
-
-				CanvasRenderingContext2D.prototype.beginPath = oldBeginPath;
-				CanvasRenderingContext2D.prototype.closePath = oldClosePath;
 			}
 
 			this.render = function(ctx) {
@@ -2704,9 +2524,7 @@
 
 				// apply filters
 				for (var i=0; i<this.children.length; i++) {
-					if (typeof this.children[i].apply == 'function') {
-						this.children[i].apply(tempCtx, 0, 0, width + 2*px, height + 2*py);
-					}
+					this.children[i].apply(tempCtx, 0, 0, width + 2*px, height + 2*py);
 				}
 
 				// render on me
@@ -2732,47 +2550,9 @@
 		}
 		svg.Element.feMorphology.prototype = new svg.Element.ElementBase;
 
-		svg.Element.feComposite = function(node) {
-			this.base = svg.Element.ElementBase;
-			this.base(node);
-
-			this.apply = function(ctx, x, y, width, height) {
-				// TODO: implement
-			}
-		}
-		svg.Element.feComposite.prototype = new svg.Element.ElementBase;
-
 		svg.Element.feColorMatrix = function(node) {
 			this.base = svg.Element.ElementBase;
 			this.base(node);
-
-			var matrix = svg.ToNumberArray(this.attribute('values').value);
-			switch (this.attribute('type').valueOrDefault('matrix')) { // http://www.w3.org/TR/SVG/filters.html#feColorMatrixElement
-				case 'saturate':
-					var s = matrix[0];
-					matrix = [0.213+0.787*s,0.715-0.715*s,0.072-0.072*s,0,0,
-							  0.213-0.213*s,0.715+0.285*s,0.072-0.072*s,0,0,
-							  0.213-0.213*s,0.715-0.715*s,0.072+0.928*s,0,0,
-							  0,0,0,1,0,
-							  0,0,0,0,1];
-					break;
-				case 'hueRotate':
-					var a = matrix[0] * Math.PI / 180.0;
-					var c = function (m1,m2,m3) { return m1 + Math.cos(a)*m2 + Math.sin(a)*m3; };
-					matrix = [c(0.213,0.787,-0.213),c(0.715,-0.715,-0.715),c(0.072,-0.072,0.928),0,0,
-							  c(0.213,-0.213,0.143),c(0.715,0.285,0.140),c(0.072,-0.072,-0.283),0,0,
-							  c(0.213,-0.213,-0.787),c(0.715,-0.715,0.715),c(0.072,0.928,0.072),0,0,
-							  0,0,0,1,0,
-							  0,0,0,0,1];
-					break;
-				case 'luminanceToAlpha':
-					matrix = [0,0,0,0,0,
-							  0,0,0,0,0,
-							  0,0,0,0,0,
-							  0.2125,0.7154,0.0721,0,0,
-							  0,0,0,0,1];
-					break;
-			}
 
 			function imGet(img, x, y, width, height, rgba) {
 				return img[y*width*4 + x*4 + rgba];
@@ -2782,12 +2562,8 @@
 				img[y*width*4 + x*4 + rgba] = val;
 			}
 
-			function m(i, v) {
-				var mi = matrix[i];
-				return mi * (mi < 0 ? v - 255 : v);
-			}
-
 			this.apply = function(ctx, x, y, width, height) {
+				// only supporting grayscale for now per Issue 195, need to extend to all matrix
 				// assuming x==0 && y==0 for now
 				var srcData = ctx.getImageData(0, 0, width, height);
 				for (var y = 0; y < height; y++) {
@@ -2795,11 +2571,10 @@
 						var r = imGet(srcData.data, x, y, width, height, 0);
 						var g = imGet(srcData.data, x, y, width, height, 1);
 						var b = imGet(srcData.data, x, y, width, height, 2);
-						var a = imGet(srcData.data, x, y, width, height, 3);
-						imSet(srcData.data, x, y, width, height, 0, m(0,r)+m(1,g)+m(2,b)+m(3,a)+m(4,1));
-						imSet(srcData.data, x, y, width, height, 1, m(5,r)+m(6,g)+m(7,b)+m(8,a)+m(9,1));
-						imSet(srcData.data, x, y, width, height, 2, m(10,r)+m(11,g)+m(12,b)+m(13,a)+m(14,1));
-						imSet(srcData.data, x, y, width, height, 3, m(15,r)+m(16,g)+m(17,b)+m(18,a)+m(19,1));
+						var gray = (r + g + b) / 3;
+						imSet(srcData.data, x, y, width, height, 0, gray);
+						imSet(srcData.data, x, y, width, height, 1, gray);
+						imSet(srcData.data, x, y, width, height, 2, gray);
 					}
 				}
 				ctx.clearRect(0, 0, width, height);
@@ -2816,8 +2591,8 @@
 			this.extraFilterDistance = this.blurRadius;
 
 			this.apply = function(ctx, x, y, width, height) {
-				if (typeof stackBlur.canvasRGBA == 'undefined') {
-					svg.log('ERROR: StackBlur.js must be included for blur to work');
+				if (typeof(stackBlurCanvasRGBA) == 'undefined') {
+					if (typeof(console) != 'undefined') { console.log('ERROR: StackBlur.js must be included for blur to work'); }
 					return;
 				}
 
@@ -2825,7 +2600,7 @@
 				ctx.canvas.id = svg.UniqueId();
 				ctx.canvas.style.display = 'none';
 				document.body.appendChild(ctx.canvas);
-				stackBlur.canvasRGBA(ctx.canvas.id, x, y, width, height, this.blurRadius);
+				stackBlurCanvasRGBA(ctx.canvas.id, x, y, width, height, this.blurRadius);
 				document.body.removeChild(ctx.canvas);
 			}
 		}
@@ -2842,7 +2617,7 @@
 		svg.Element.desc.prototype = new svg.Element.ElementBase;
 
 		svg.Element.MISSING = function(node) {
-			svg.log('ERROR: Element \'' + node.nodeName + '\' not yet implemented.');
+			if (typeof(console) != 'undefined') { console.log('ERROR: Element \'' + node.nodeName + '\' not yet implemented.'); }
 		}
 		svg.Element.MISSING.prototype = new svg.Element.ElementBase;
 
@@ -2851,7 +2626,7 @@
 			var className = node.nodeName.replace(/^[^:]+:/,''); // remove namespace
 			className = className.replace(/\-/g,''); // remove dashes
 			var e = null;
-			if (typeof svg.Element[className] != 'undefined') {
+			if (typeof(svg.Element[className]) != 'undefined') {
 				e = new svg.Element[className](node);
 			}
 			else {
@@ -2901,7 +2676,6 @@
 
 			var e = svg.CreateElement(dom.documentElement);
 			e.root = true;
-			e.addStylesFromStyleDefinition();
 
 			// render loop
 			var isFirstRender = true;
@@ -2930,25 +2704,17 @@
 
 				if (svg.opts['offsetX'] != null) e.attribute('x', true).value = svg.opts['offsetX'];
 				if (svg.opts['offsetY'] != null) e.attribute('y', true).value = svg.opts['offsetY'];
-				if (svg.opts['scaleWidth'] != null || svg.opts['scaleHeight'] != null) {
-					var xRatio = null, yRatio = null, viewBox = svg.ToNumberArray(e.attribute('viewBox').value);
-
-					if (svg.opts['scaleWidth'] != null) {
-						if (e.attribute('width').hasValue()) xRatio = e.attribute('width').toPixels('x') / svg.opts['scaleWidth'];
-						else if (!isNaN(viewBox[2])) xRatio = viewBox[2] / svg.opts['scaleWidth'];
-					}
-
-					if (svg.opts['scaleHeight'] != null) {
-						if (e.attribute('height').hasValue()) yRatio = e.attribute('height').toPixels('y') / svg.opts['scaleHeight'];
-						else if (!isNaN(viewBox[3])) yRatio = viewBox[3] / svg.opts['scaleHeight'];
-					}
-
-					if (xRatio == null) { xRatio = yRatio; }
-					if (yRatio == null) { yRatio = xRatio; }
+				if (svg.opts['scaleWidth'] != null && svg.opts['scaleHeight'] != null) {
+					var xRatio = 1, yRatio = 1, viewBox = svg.ToNumberArray(e.attribute('viewBox').value);
+					if (e.attribute('width').hasValue()) xRatio = e.attribute('width').toPixels('x') / svg.opts['scaleWidth'];
+					else if (!isNaN(viewBox[2])) xRatio = viewBox[2] / svg.opts['scaleWidth'];
+					if (e.attribute('height').hasValue()) yRatio = e.attribute('height').toPixels('y') / svg.opts['scaleHeight'];
+					else if (!isNaN(viewBox[3])) yRatio = viewBox[3] / svg.opts['scaleHeight'];
 
 					e.attribute('width', true).value = svg.opts['scaleWidth'];
 					e.attribute('height', true).value = svg.opts['scaleHeight'];
-					e.style('transform', true, true).value += ' scale('+(1.0/xRatio)+','+(1.0/yRatio)+')';
+					e.attribute('viewBox', true).value = '0 0 ' + (cWidth * xRatio) + ' ' + (cHeight * yRatio);
+					e.attribute('preserveAspectRatio', true).value = 'none';
 				}
 
 				// clear and render
@@ -2958,7 +2724,7 @@
 				e.render(ctx);
 				if (isFirstRender) {
 					isFirstRender = false;
-					if (typeof svg.opts['renderCallback'] == 'function') svg.opts['renderCallback'](dom);
+					if (typeof(svg.opts['renderCallback']) == 'function') svg.opts['renderCallback']();
 				}
 			}
 
@@ -2988,7 +2754,7 @@
 				}
 
 				// need update from redraw?
-				if (typeof svg.opts['forceRedraw'] == 'function') {
+				if (typeof(svg.opts['forceRedraw']) == 'function') {
 					if (svg.opts['forceRedraw']() == true) needUpdate = true;
 				}
 
@@ -3057,30 +2823,20 @@
 		});
 
 		return svg;
-	};
-
-	if (typeof CanvasRenderingContext2D  != 'undefined') {
-		CanvasRenderingContext2D.prototype.drawSvg = function(s, dx, dy, dw, dh, opts) {
-			var cOpts = {
-				ignoreMouse: true,
-				ignoreAnimation: true,
-				ignoreDimensions: true,
-				ignoreClear: true,
-				offsetX: dx,
-				offsetY: dy,
-				scaleWidth: dw,
-				scaleHeight: dh
-			}
-			
-			for(var prop in opts) {
-				if(opts.hasOwnProperty(prop)){
-					cOpts[prop] = opts[prop];
-				}
-			}
-			canvg(this.canvas, s, cOpts);
-		}
 	}
+})();
 
-	return canvg;
-
-}));
+if (typeof(CanvasRenderingContext2D) != 'undefined') {
+	CanvasRenderingContext2D.prototype.drawSvg = function(s, dx, dy, dw, dh) {
+		canvg(this.canvas, s, {
+			ignoreMouse: true,
+			ignoreAnimation: true,
+			ignoreDimensions: true,
+			ignoreClear: true,
+			offsetX: dx,
+			offsetY: dy,
+			scaleWidth: dw,
+			scaleHeight: dh
+		});
+	}
+}
