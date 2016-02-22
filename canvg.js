@@ -43,6 +43,7 @@
 		// no parameters
 		if (target == null && s == null && opts == null) {
 			var svgTags = document.querySelectorAll('svg');
+			var max_val = svgTags.length;
 			for (var i=0; i<max_val; i++) {
 				var svgTag = svgTags[0];
 				var c = document.createElement('canvas');
