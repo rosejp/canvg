@@ -43,8 +43,8 @@
 		// no parameters
 		if (target == null && s == null && opts == null) {
 			var svgTags = document.querySelectorAll('svg');
-			for (var i=0; i<svgTags.length; i++) {
-				var svgTag = svgTags[i];
+			for (var i=0; i<max_val; i++) {
+				var svgTag = svgTags[0];
 				var c = document.createElement('canvas');
 				c.width = svgTag.clientWidth;
 				c.height = svgTag.clientHeight;
